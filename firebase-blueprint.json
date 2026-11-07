@@ -1,0 +1,165 @@
+{
+  "entities": {
+    "Mess": {
+      "title": "Mess",
+      "description": "Mess organization settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "currency": { "type": "string", "maxLength": 10 },
+        "timezone": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "currency", "timezone"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Mess resident or associate member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["admin", "manager", "member"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "phone": { "type": "string", "maxLength": 30 },
+        "activeFrom": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "role", "status"]
+    },
+    "ServiceDay": {
+      "title": "ServiceDay",
+      "description": "Daily meal service status and exception tracking",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "lunchServed": { "type": "boolean" },
+        "nightServed": { "type": "boolean" },
+        "exceptionReason": { "type": "string", "maxLength": 300 },
+        "isFridayOverride": { "type": "boolean" },
+        "needsReview": { "type": "boolean" },
+        "reviewNote": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["date", "lunchServed", "nightServed"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily member meal attendance record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "memberId": { "type": "string" },
+        "lunchAttended": { "type": "boolean" },
+        "nightAttended": { "type": "boolean" },
+        "calculatedUnits": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["date", "memberId", "lunchAttended", "nightAttended", "calculatedUnits"]
+    },
+    "GuestAttendance": {
+      "title": "GuestAttendance",
+      "description": "Guest meal count linked to a host member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "hostMemberId": { "type": "string" },
+        "guestName": { "type": "string", "maxLength": 100 },
+        "lunchCount": { "type": "number" },
+        "nightCount": { "type": "number" },
+        "calculatedUnits": { "type": "number" },
+        "note": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "hostMemberId", "lunchCount", "nightCount", "calculatedUnits"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Financial purchase and market transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "description": { "type": "string", "maxLength": 200 },
+        "amount": { "type": "number" },
+        "category": { "type": "string", "maxLength": 50 },
+        "allocationMethod": { "type": "string", "enum": ["meal_pool", "split_equally", "member_charge", "record_only"] },
+        "paidByMemberId": { "type": "string" },
+        "isPersonalFund": { "type": "boolean" },
+        "note": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "description", "amount", "category", "allocationMethod", "isPersonalFund"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Member deposit or payment transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "memberId": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "maxLength": 50 },
+        "reference": { "type": "string", "maxLength": 100 },
+        "reversalOfId": { "type": "string" },
+        "note": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "memberId", "amount", "method"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable log of financial adjustments, overrides, and month closures",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actor": { "type": "string", "maxLength": 100 },
+        "action": { "type": "string", "maxLength": 100 },
+        "entity": { "type": "string", "maxLength": 50 },
+        "entityId": { "type": "string" },
+        "details": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["actor", "action", "entity", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/messes/{messId}": {
+      "schema": "Mess",
+      "description": "Mess configuration document"
+    },
+    "/members/{memberId}": {
+      "schema": "Member",
+      "description": "Member profile"
+    },
+    "/service_days/{serviceDayId}": {
+      "schema": "ServiceDay",
+      "description": "Daily service availability status"
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Member daily meal attendance"
+    },
+    "/guest_attendance/{guestId}": {
+      "schema": "GuestAttendance",
+      "description": "Guest daily meal record"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Recorded mess expense transaction"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Member deposit or payment transaction"
+    },
+    "/audit_log/{logId}": {
+      "schema": "AuditLog",
+      "description": "Audit entry log"
+    }
+  }
+}

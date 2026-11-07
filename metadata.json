@@ -1,0 +1,6 @@
+{
+  "name": "Mess Manager",
+  "description": "Mobile-friendly mess accounting app for tracking daily meals, expenses, deposits, weighted calculations, and member settlement balances.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
