@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { formatCurrency, formatUnits } from '../lib/calculations.ts';
+import { TabId } from './Sidebar.tsx';
 import {
   Scale,
   Download,
@@ -12,11 +13,17 @@ import {
   Info,
   ShieldCheck,
   Lock,
+  Plus,
 } from 'lucide-react';
 
-export const SettlementView: React.FC = () => {
-  const { reconciliation, selectedMonth } = useApp();
+interface SettlementViewProps {
+  setActiveTab?: (tab: TabId) => void;
+}
 
+export const SettlementView: React.FC<SettlementViewProps> = ({ setActiveTab }) => {
+  const { reconciliation, selectedMonth, setDepositTargetMemberId, currentUser } = useApp();
+
+  const isManager = currentUser.role === 'manager' || currentUser.role === 'admin';
   const [isMonthClosed, setIsMonthClosed] = useState<boolean>(false);
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
 
@@ -215,6 +222,7 @@ export const SettlementView: React.FC = () => {
                 <th className="py-2.5 px-3 text-right">Reimbursements</th>
                 <th className="py-2.5 px-4 text-right">Net Balance</th>
                 <th className="py-2.5 px-4 text-center">Status</th>
+                {isManager && <th className="py-2.5 px-3 text-center">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -241,7 +249,7 @@ export const SettlementView: React.FC = () => {
                   <td className="py-3 px-3 text-right font-mono text-slate-600">
                     {row.individualCharges > 0 ? formatCurrency(row.individualCharges) : '—'}
                   </td>
-                  <td className="py-3 px-3 text-right font-mono text-slate-800">
+                  <td className="py-3 px-3 text-right font-mono text-slate-800 font-semibold">
                     {formatCurrency(row.totalPayments)}
                   </td>
                   <td className="py-3 px-3 text-right font-mono text-emerald-700">
@@ -279,6 +287,22 @@ export const SettlementView: React.FC = () => {
                       </span>
                     )}
                   </td>
+                  {isManager && (
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDepositTargetMemberId(row.memberId);
+                          setActiveTab?.('payments');
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors cursor-pointer"
+                        title={`Record deposit directly for ${row.memberName}`}
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>+ Deposit</span>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -14,6 +14,7 @@ import { PaymentsView } from './components/PaymentsView.tsx';
 import { SettlementView } from './components/SettlementView.tsx';
 import { MembersView } from './components/MembersView.tsx';
 import { SettingsView } from './components/SettingsView.tsx';
+import { OfflineIndicator } from './components/OfflineIndicator.tsx';
 
 function MainLayout() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
@@ -33,11 +34,14 @@ function MainLayout() {
           {activeTab === 'meals' && <DailyLogView />}
           {activeTab === 'expenses' && <ExpensesView />}
           {activeTab === 'payments' && <PaymentsView />}
-          {activeTab === 'settlement' && <SettlementView />}
-          {activeTab === 'members' && <MembersView />}
+          {activeTab === 'settlement' && <SettlementView setActiveTab={setActiveTab} />}
+          {activeTab === 'members' && <MembersView setActiveTab={setActiveTab} />}
           {activeTab === 'settings' && <SettingsView />}
         </main>
       </div>
+
+      {/* Non-intrusive offline connectivity status */}
+      <OfflineIndicator />
     </div>
   );
 }

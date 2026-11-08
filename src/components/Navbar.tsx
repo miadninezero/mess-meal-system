@@ -1,19 +1,20 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.tsx';
-import { CheckCircle2, Clock, AlertTriangle, UserCheck, Shield } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Shield } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton.tsx';
 
 export const Navbar: React.FC = () => {
   const { currentUser, switchPersona, members, selectedMonth, setSelectedMonth, saveStatus } = useApp();
 
   return (
-    <header className="flex items-center justify-between gap-6 px-6 py-3.5 bg-white border-b border-slate-200 sticky top-0 z-30">
+    <header className="flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-6 py-3 bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       {/* Zone 1: Single text element wordmark */}
       <div className="flex items-center gap-3">
-        <a href="#dashboard" className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0 flex items-center gap-2">
+        <a href="#dashboard" className="text-base sm:text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0 flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
             M
           </div>
-          <span>Mess Manager</span>
+          <span className="hidden xs:inline sm:inline">Mess Manager</span>
         </a>
       </div>
 
@@ -56,12 +57,14 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Zone 3: Interactive Role / Persona switcher for evaluation & live use */}
-      <div className="flex items-center gap-2.5">
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+      {/* Zone 3: Install App Button & Persona/Auth switcher */}
+      <div className="flex items-center gap-2">
+        <PWAInstallButton variant="compact" />
+
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 sm:px-2.5 py-1">
           <Shield className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          <div className="flex flex-col text-left">
-            <span className="text-[11px] font-semibold text-slate-900 leading-tight">
+          <div className="hidden xs:flex flex-col text-left">
+            <span className="text-[11px] font-semibold text-slate-900 leading-tight truncate max-w-[90px] sm:max-w-none">
               {currentUser.displayName}
             </span>
             <span className="text-[10px] text-slate-500 capitalize leading-tight">

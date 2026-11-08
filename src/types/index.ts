@@ -6,6 +6,8 @@ export interface UserProfile {
   displayName: string;
   role: Role;
   memberId?: string;
+  photoURL?: string;
+  isGoogleAuth?: boolean;
 }
 
 export interface Member {

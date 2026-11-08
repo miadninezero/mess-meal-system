@@ -20,8 +20,9 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) => {
-  const { reconciliation, members, serviceDays, confirmFridayReview, selectedMonth } = useApp();
+  const { reconciliation, members, serviceDays, confirmFridayReview, selectedMonth, setDepositTargetMemberId, currentUser } = useApp();
 
+  const isManager = currentUser.role === 'manager' || currentUser.role === 'admin';
   const activeMembersCount = members.filter((m) => m.status === 'active').length;
 
   // Check for any service days with review flags in selected month
@@ -61,7 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
           >
             <Wallet className="w-3.5 h-3.5" />
-            <span>Record Deposit</span>
+            <span>{isManager ? 'Record Deposit' : 'View Deposits'}</span>
           </button>
           <button
             onClick={() => setActiveTab('settlement')}
@@ -206,6 +207,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
                 <th className="py-2.5 px-4 text-right">Deposits Paid</th>
                 <th className="py-2.5 px-4 text-right">Net Balance</th>
                 <th className="py-2.5 px-4 text-center">Status</th>
+                {isManager && <th className="py-2.5 px-4 text-center">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -270,6 +272,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
                       </span>
                     )}
                   </td>
+                  {isManager && (
+                    <td className="py-2.5 px-4 text-center">
+                      <button
+                        onClick={() => {
+                          setDepositTargetMemberId(row.memberId);
+                          setActiveTab('payments');
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors cursor-pointer"
+                        title={`Record deposit for ${row.memberName}`}
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Deposit</span>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

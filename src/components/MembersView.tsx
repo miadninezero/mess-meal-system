@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import { Member, Role } from '../types/index.ts';
-import { Users, UserPlus, Phone, Mail, Shield, CheckCircle2, UserX, X } from 'lucide-react';
+import { TabId } from './Sidebar.tsx';
+import { formatCurrency } from '../lib/calculations.ts';
+import { Users, UserPlus, Phone, Mail, Shield, CheckCircle2, UserX, X, Plus } from 'lucide-react';
 
-export const MembersView: React.FC = () => {
-  const { members, addMember, updateMemberStatus } = useApp();
+interface MembersViewProps {
+  setActiveTab?: (tab: TabId) => void;
+}
+
+export const MembersView: React.FC<MembersViewProps> = ({ setActiveTab }) => {
+  const { members, payments, selectedMonth, addMember, updateMemberStatus, setDepositTargetMemberId, currentUser } = useApp();
+  const isManager = currentUser.role === 'manager' || currentUser.role === 'admin';
 
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
@@ -56,6 +63,9 @@ export const MembersView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {members.map((m) => {
           const isActive = m.status === 'active';
+          const memberDeposits = payments
+            .filter((p) => p.memberId === m.id && p.date.startsWith(selectedMonth))
+            .reduce((sum, p) => sum + p.amount, 0);
 
           return (
             <div
@@ -104,9 +114,31 @@ export const MembersView: React.FC = () => {
                     Member since {m.activeFrom}
                   </div>
                 </div>
+
+                {/* Per-member deposit status for selected month */}
+                <div className="mt-3 p-2.5 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block uppercase font-medium">Deposited ({selectedMonth})</span>
+                    <span className="text-xs font-bold font-mono text-slate-900">{formatCurrency(memberDeposits)}</span>
+                  </div>
+                  {isActive && isManager && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDepositTargetMemberId(m.id);
+                        setActiveTab?.('payments');
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors cursor-pointer"
+                      title={`Add deposit for ${m.name}`}
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Deposit</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 mt-4 flex items-center justify-between">
+              <div className="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between">
                 <span className="text-[10px] font-mono text-slate-400">ID: {m.id}</span>
                 {isActive ? (
                   <button

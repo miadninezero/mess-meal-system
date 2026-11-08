@@ -24,13 +24,16 @@ import {
   getInitialPayments,
   getInitialServiceDays,
 } from '../lib/demoData.ts';
-import { auth, db, handleFirestoreError, OperationType, testFirestoreConnection } from '../lib/firebase.ts';
-import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { auth, db, googleAuthProvider, handleFirestoreError, OperationType, testFirestoreConnection } from '../lib/firebase.ts';
+import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 
 interface AppContextType {
   currentUser: UserProfile;
   setCurrentUser: (user: UserProfile) => void;
   switchPersona: (role: Role, memberId?: string) => void;
+  signInWithGoogle: () => Promise<void>;
+  signOutUser: () => Promise<void>;
   members: Member[];
   serviceDays: ServiceDay[];
   attendance: Attendance[];
@@ -53,11 +56,15 @@ interface AppContextType {
   addExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<void>;
+  updatePayment: (paymentId: string, updates: Partial<Payment>) => Promise<void>;
+  deletePayment: (paymentId: string) => Promise<void>;
   reversePayment: (paymentId: string, reason?: string) => Promise<void>;
   addMember: (member: Omit<Member, 'id' | 'createdAt'>) => Promise<void>;
   updateMemberStatus: (memberId: string, status: 'active' | 'inactive') => Promise<void>;
   resetToDemoData: () => void;
   reconciliation: MonthlyReconciliation;
+  depositTargetMemberId: string | null;
+  setDepositTargetMemberId: (id: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -78,6 +85,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-11');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [depositTargetMemberId, setDepositTargetMemberIdState] = useState<string | null>(null);
+
+  const setDepositTargetMemberId = (id: string | null) => {
+    if (id && currentUser.role !== 'manager' && currentUser.role !== 'admin') {
+      console.warn('Access denied: Only managers can access deposit options.');
+      return;
+    }
+    setDepositTargetMemberIdState(id);
+  };
 
   // Load state from localStorage or initialize with demo data
   const [members, setMembers] = useState<Member[]>(() => {
@@ -135,10 +151,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(`${LOCAL_STORAGE_KEY_PREFIX}payments`, JSON.stringify(payments));
   }, [payments]);
 
-  // Initial connection check
+  // Initial connection check & auth listener
   useEffect(() => {
     testFirestoreConnection().catch((err) => console.log('Offline/Local mode active', err));
-  }, []);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const matched = members.find((m) => m.email?.toLowerCase() === user.email?.toLowerCase());
+        setCurrentUser({
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || user.email?.split('@')[0] || 'User',
+          role: matched?.role || 'manager',
+          memberId: matched?.id || 'mem_1',
+          photoURL: user.photoURL || undefined,
+          isGoogleAuth: true,
+        });
+
+        // Pull any existing documents from Firestore if present
+        (async () => {
+          try {
+            const expSnap = await getDocs(collection(db, 'expenses'));
+            if (!expSnap.empty) {
+              const cloudExpenses = expSnap.docs.map((d) => d.data() as Expense);
+              setExpenses((prev) => {
+                const map = new Map<string, Expense>();
+                [...cloudExpenses, ...prev].forEach((e) => map.set(e.id, e));
+                return Array.from(map.values());
+              });
+            }
+          } catch (e) {
+            console.log('Deferred cloud load:', e);
+          }
+        })();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [members]);
+
+  // Google Login
+  const signInWithGoogle = async () => {
+    try {
+      await signInWithPopup(auth, googleAuthProvider);
+    } catch (err) {
+      console.warn('Google sign-in popup closed or cancelled:', err);
+    }
+  };
+
+  // Google Sign-out
+  const signOutUser = async () => {
+    try {
+      await signOut(auth);
+      switchPersona('manager');
+    } catch (err) {
+      console.warn('Sign out error:', err);
+    }
+  };
 
   // Persona switcher for easy role testing
   const switchPersona = (role: Role, memberId?: string) => {
@@ -150,9 +219,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         displayName: managerMember?.name || 'Tanvir Ahmed (Manager)',
         role,
         memberId: managerMember?.id,
+        isGoogleAuth: false,
       });
     } else {
-      const targetId = memberId || 'mem_3'; // default to Shakil Hasan
+      const targetId = memberId || 'mem_3';
       const member = members.find((m) => m.id === targetId) || members[1];
       setCurrentUser({
         uid: `user_${member?.id || 'member'}`,
@@ -160,6 +230,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         displayName: member?.name || 'Mess Member',
         role: 'member',
         memberId: member?.id,
+        isGoogleAuth: false,
       });
     }
   };
@@ -242,7 +313,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Attempt async cloud sync to Firestore
       try {
-        await setDoc(doc(db, 'service_days', date), newServiceDay);
+        if (auth.currentUser) {
+          await setDoc(doc(db, 'service_days', date), newServiceDay);
+          for (const att of newAttendanceList) {
+            await setDoc(doc(db, 'attendance', att.id), att);
+          }
+        }
       } catch (e) {
         console.warn('Local save successful; Firestore sync deferred:', e);
       }
@@ -285,7 +361,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setExpenses((prev) => [newExpense, ...prev]);
 
     try {
-      await setDoc(doc(db, 'expenses', newExpense.id), newExpense);
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'expenses', newExpense.id), newExpense);
+      }
     } catch (e) {
       console.warn('Saved locally; Cloud sync deferred:', e);
     }
@@ -300,8 +378,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSaveStatus('saved');
   };
 
-  // Add payment deposit
+  // Add payment deposit (Manager only)
   const addPayment = async (paymentData: Omit<Payment, 'id' | 'createdAt'>) => {
+    if (currentUser.role !== 'manager' && currentUser.role !== 'admin') {
+      console.warn('Access denied: Only managers can add deposits.');
+      return;
+    }
     setSaveStatus('saving');
     const newPayment: Payment = {
       ...paymentData,
@@ -312,7 +394,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPayments((prev) => [newPayment, ...prev]);
 
     try {
-      await setDoc(doc(db, 'payments', newPayment.id), newPayment);
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'payments', newPayment.id), newPayment);
+      }
     } catch (e) {
       console.warn('Saved locally; Cloud sync deferred:', e);
     }
@@ -320,8 +404,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSaveStatus('saved');
   };
 
-  // Reverse a payment
+  // Update or reassign a payment (Manager only)
+  const updatePayment = async (paymentId: string, updates: Partial<Payment>) => {
+    if (currentUser.role !== 'manager' && currentUser.role !== 'admin') {
+      console.warn('Access denied: Only managers can update deposits.');
+      return;
+    }
+    setSaveStatus('saving');
+    setPayments((prev) =>
+      prev.map((p) => (p.id === paymentId ? { ...p, ...updates } : p))
+    );
+
+    try {
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'payments', paymentId), updates, { merge: true });
+      }
+    } catch (e) {
+      console.warn('Saved locally; Cloud sync deferred:', e);
+    }
+
+    setSaveStatus('saved');
+  };
+
+  // Delete a payment entry (Manager only)
+  const deletePayment = async (paymentId: string) => {
+    if (currentUser.role !== 'manager' && currentUser.role !== 'admin') {
+      console.warn('Access denied: Only managers can delete deposits.');
+      return;
+    }
+    setSaveStatus('saving');
+    setPayments((prev) => prev.filter((p) => p.id !== paymentId));
+    setSaveStatus('saved');
+  };
+
+  // Reverse a payment (Manager only)
   const reversePayment = async (paymentId: string, reason?: string) => {
+    if (currentUser.role !== 'manager' && currentUser.role !== 'admin') {
+      console.warn('Access denied: Only managers can reverse deposits.');
+      return;
+    }
     setSaveStatus('saving');
     const original = payments.find((p) => p.id === paymentId);
     if (!original) return;
@@ -390,6 +511,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         setCurrentUser,
         switchPersona,
+        signInWithGoogle,
+        signOutUser,
         members,
         serviceDays,
         attendance,
@@ -404,11 +527,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addExpense,
         deleteExpense,
         addPayment,
+        updatePayment,
+        deletePayment,
         reversePayment,
         addMember,
         updateMemberStatus,
         resetToDemoData,
         reconciliation,
+        depositTargetMemberId,
+        setDepositTargetMemberId,
       }}
     >
       {children}
